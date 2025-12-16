@@ -2,7 +2,6 @@ package auth
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"golang.org/x/crypto/bcrypt"
@@ -14,33 +13,44 @@ type RegisterRequest struct {
 	Email     string `json:"email"`
 	Password  string `json:"password"`
 	Password2 string `json:"password2"`
-	BirthDate string `json:"birth_date"`
-	AvatarURL string `json:"avatar"`
 }
 
-// Stub — просто заглушки, чтобы код работал
-// Потом мы их заполним логикой
-
 func Register(w http.ResponseWriter, r *http.Request) {
-	log.Println("Register handler called")
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
 	var req RegisterRequest
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	// Временно просто пароль хэшируем
-	_, _ = bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if req.Password != req.Password2 {
+		http.Error(w, "Passwords do not match", http.StatusBadRequest)
+		return
+	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Password error", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = DB.Exec(
+		"INSERT INTO users (name, surname, email, password) VALUES (?, ?, ?, ?)",
+		req.Name, req.Surname, req.Email, string(hash),
+	)
+	if err != nil {
+		http.Error(w, "User already exists", http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("User registered"))
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
-	log.Println("Login handler called")
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	w.Write([]byte("Login not implemented yet"))
 }
